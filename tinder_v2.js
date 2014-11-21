@@ -6,141 +6,115 @@ var CardDragStart = function(event, layer) {
   return layer.states.switch('hold');
 };
 
-var CardDragEnd = function(event, layer) {
+var CardDragEnd = function(event, card) {
   //console.log('CardDragEnd');
-  var layers = container.subLayers;
-  var nextCard = null;
-  for (var i =0; i<layers.length; i++) {
-    //console.log('SubLayer', layers[i].name, layers[i].visible);
-    if (layers[i] === layer) {
-      break;
-    }
-
-    if (layers[i].visible) {
-      nextCard = layers[i];
-    }
-  }
-
 
   var d = new Date();
-  var duration = d.getTime() - layer.dragStartTime;
+  var duration = d.getTime() - card.dragStartTime;
 
-  var turnCard = false;
-  if (duration < 300 && layer.isClick) {
-    turnCard = true;
+  var yDistance = (card.y - card.dragStartY);
+  var xDistance = (card.x - card.dragStartX);
+  var target;
+  var source;
+  var newTopCard;
+
+  if (xDistance > 0) {
+    target = 'right';
+    source = 'left';
+    newTopCard = cards[card.cardNumber-1];
+  }
+  else {
+    target = 'left';
+    source = 'right';
+    newTopCard = cards[card.cardNumber+1];
   }
 
-  if (layer.animation) {
-    layer.animation.stop();
-  }
-
-  var target = 'top';
-  var yDistance = (layer.y - layer.dragStartY);
-  var remvoeCard = false;
-  if (!turnCard && yDistance > layer.height * 0.4) {
+  if (Math.abs(xDistance) > card.width * 0.1 && newTopCard) {
     remvoeCard = true;
-    target = 'remove';
+    SetDragInfo(card, false);
+    card.states.switch(target);
 
-    if (nextCard) {
-      console.log('set nextCard to top', nextCard.name);
-      //nextCard.states.switch('top');
-      nextCard.states.switchInstant('top');
+    if (newTopCard) {
+      SetZOrder(newTopCard.cardNumber, true);
+      newTopCard.states.switch('top');
+      SetDragInfo(newTopCard, true);
     }
   }
-  if (turnCard) {
-    layer.animation = layer.animate({
-      properties: {
-        rotationY: 90,
-        shadowY: 56,
-        shadowX: 456,
-        shadowBlur: 128,
-        shadowColor: "rgba(0, 0, 0, 0.25)"
-      },
-      curve: 'ease',
-      time: 0.3
-    });
-  }
   else {
-    layer.states.switch(target);
+    SetZOrder(card.cardNumber, true);
+    card.states.switch('top');
+    if (newTopCard && xDistance != 0) {
+      newTopCard.states.switch(source);
+    }
   }
-
-
-  //var ret = layer.states.switch(target);
-  //console.log(ret, layer.animation, turnCard);
-
-  /*
-  if (!turnCard) {
-  }
-  else {
-    layer.animation = layer.animate({
-      properties: {
-        x: layer.dragStartX,
-        y: targetY,
-        rotationZ: 0,
-        rotationY: turnCard ? 90 : 0
-      },
-      curve: "ease",
-      time: turnCard ? 0.4 : 0.10
-    });
-  }
-  */
-
-  if (turnCard) {
-    layer.animation.on('end', function () {
-      console.log('Turn Card Animation end');
-      layer.visible = false;
-      layer.flipSide.visible = true;
-
-      layer.flipSide.states.animationOptions = {
-        time: 0.3
-      };
-
-
-      layer.flipSide.states.switch('top');
-    });
-  }
-
-  return layer.flipSide;
 };
 
 function CardDragMove(event, card) {
   var xDistance = (card.x - card.dragStartX);
   var yDistance = (card.y - card.dragStartY);
 
-
-
-
-  //console.log('Move', xDistance, card.states._states.right.scale, Utils.modulate(Math.abs(xDistance), [0, 190], [1, card.states._states.right.scale], true));
-  console.log('Move', xDistance, card.originX);
-
   if (card.animation) {
-    card.animation.stop();
+    //card.animation.stop();
   }
 
   if (Math.abs(xDistance) > 5) {
     card.isClick = false;
   }
 
+  if (xDistance != 0) {
 
-  var lowScale = card.states._states.right.scale;
-  var highScale = 1;
+    var newTopCard = cards[card.cardNumber + (xDistance < 0 ? 1 : -1)];
+    var state1;
+    var state2;
+    if (xDistance > 0) {
+      newTopCard = cards[card.cardNumber -1];
+      state1 = card.states._states.left;
+      state2 = card.states._states.half_left;
+    }
+    else {
+      newTopCard = cards[card.cardNumber + 1];
+      state1 = card.states._states.right;
+      state2 = card.states._states.half_right;
+    }
 
-  var newScale = highScale - Utils.modulate(Math.abs(xDistance), [0, 164], [0, highScale - lowScale], true);
-  card.scale = newScale;
 
-  var newTopCard = cards[card.cardNumber-1];
-  var newTopScale = Utils.modulate(Math.abs(xDistance), [0, 164], [lowScale, highScale], true);
+    var lowScale = card.states._states.right.scale;
+    var highScale = 1;
 
-  newTopCard.scale = newTopScale;
-  if (Math.abs(xDistance) <= 120) {
-    SetZOrder(card.cardNumber);
-    newTopCard.x = Utils.modulate(Math.abs(xDistance), [0, 120], [card.states._states.left.x, card.states._states.half_left.x], false);
+    var newScale = highScale - Utils.modulate(Math.abs(xDistance), [0, 164], [0, highScale - lowScale], true);
+    card.scale = newScale;
+
+    var newTopScale = Utils.modulate(Math.abs(xDistance), [0, 164], [lowScale, highScale], true);
+
+    var newTopCard_x = 0;
+    if (Math.abs(xDistance) <= 120) {
+      SetZOrder(card.cardNumber, false);
+      newTopCard_x = Utils.modulate(Math.abs(xDistance), [0, 120], [state1.x, state2.x], false);
+    }
+    else {
+      if (newTopCard) {
+        SetZOrder(newTopCard.cardNumber, false);
+      }
+      newTopCard_x = Utils.modulate(Math.abs(xDistance), [120, 164], [state2.x, card.dragStartX], false);
+      if (xDistance > 0) {
+        if (newTopCard_x > card.dragStartX) {
+          newTopCard_x = card.dragStartX
+        }
+      }
+      else {
+        if (newTopCard_x < card.dragStartX) {
+          newTopCard_x = card.dragStartX
+        }
+      }
+    }
+
+    if (newTopCard) {
+      newTopCard.scale = newTopScale;
+      newTopCard.x = newTopCard_x;
+    }
+
+    //console.log('Move', xDistance, newTopCard_x, state1, state2);
   }
-  else {
-    SetZOrder(newTopCard.cardNumber);
-    newTopCard.x = Utils.modulate(Math.abs(xDistance), [120, 164], [card.states._states.half_left.x, card.dragStartX], true);
-  }
-
 
 
   //card.scale();
@@ -158,7 +132,7 @@ function CardFlip(event, layer) {
     console.log('CardFlip', layer.isClick, duration);
 
     if (layer.animation) {
-      layer.animation.stop();
+      //layer.animation.stop();
     }
 
     return layer.animation = layer.animate({
@@ -185,12 +159,12 @@ function add2SideCard(container, cardNumber, channel) {
   return top;
 }
 
-function SetDragInfo(card) {
-  enableScroll(card, 1, 0);
+function SetDragInfo(card, enable) {
+  enableScroll(card, enable ? 1 : 0, 0);
   card.on(Events.DragStart, CardDragStart);
   card.on(Events.DragEnd, CardDragEnd);
   card.on(Events.DragMove, CardDragMove);
-  card.on(Events.Click, CardFlip);
+  //card.on(Events.Click, CardFlip);
 }
 function addCard(container, cardNumber, text, isFace, channel) {
   var card = add(container, createLayer(width / 1.2, 320));
@@ -244,7 +218,7 @@ function addCard(container, cardNumber, text, isFace, channel) {
     },
 
     left: {
-      x: card.x - (card.width/2 + 8),
+      x: width/2 - card.width - 8,
       y: card.y,
       scale: sideScale,
       shadowY: 2,
@@ -252,14 +226,20 @@ function addCard(container, cardNumber, text, isFace, channel) {
       shadowBlur: 28,
       shadowColor: "rgba(0, 0, 0, 0.25)",
     },
+    left2: {
+      x: width/2 - card.width - 8,
+      y: card.y,
+      scale: sideScale,
+      shadowColor: null,
+    },
     half_left: {
-      x: card.width/2 - 8 - card.width,
+      x: width/2 - card.width - 8,
       y: card.y,
       scale: 1
     },
 
     right: {
-      x: card.x + (card.width/2 + 8),
+      x: width/2 + 8,
       y: card.y,
       scale: sideScale,
       shadowY: 2,
@@ -267,9 +247,15 @@ function addCard(container, cardNumber, text, isFace, channel) {
       shadowBlur: 28,
       shadowColor: "rgba(0, 0, 0, 0.25)",
     },
+    right2: {
+      x: width/2 + 8,
+      y: card.y,
+      scale: sideScale,
+      shadowColor: null,
+    },
 
     half_right: {
-      x: card.width/2 + 8,
+      x: width/2 + 8,
       y: card.y,
       scale: 1
     }
@@ -320,9 +306,34 @@ function addCard(container, cardNumber, text, isFace, channel) {
   return card;
 }
 
-function SetZOrder(cardIndex) {
+function SetZOrder(cardIndex, includePos) {
   for (i=0; i<20; i++) {
-    cards[i].index = 100 - Math.abs(cardIndex - i);
+    var card = cards[i];
+    card.index = 100 - Math.abs(cardIndex - i);
+
+    if (includePos) {
+      if (i === cardIndex + 1) {
+        card.states.switchInstant('right');
+        //console.log('right', card.height);
+      }
+      if (i >= cardIndex + 2) {
+        card.states.switchInstant('right2');
+      }
+      if (i === cardIndex - 1) {
+        card.states.switchInstant('left');
+      }
+      if (i <= cardIndex - 2) {
+        card.states.switchInstant('left2');
+      }
+    }
+  }
+
+}
+
+function DumpCards() {
+  for (i=0; i<20; i++) {
+    var card = cards[i];
+    console.log(card.cardNumber, card.x, card.name, card.states.current, card.shadowY, card.shadowColor);
   }
 }
 
@@ -345,29 +356,25 @@ var tinder = function() {
     cards.push(add2SideCard(container,i, channelData[i]));
   }
 
-  SetZOrder(cardIndex);
+  SetZOrder(cardIndex, true);
   for (i=0; i<20; i++) {
     var card = cards[i];
     if (i == cardIndex) {
       card.states.switchInstant('top');
-      SetDragInfo(card);
+      SetDragInfo(card, true);
       console.log('top', card.height);
-    }
-    if (i === cardIndex + 1) {
-      card.states.switchInstant('right');
-      console.log('right', card.height);
-    }
-    if (i >= cardIndex + 2) {
-      card.states.switchInstant('remove');
-    }
-    if (i === cardIndex - 1) {
-      card.states.switchInstant('left');
-    }
-    if (i <= cardIndex - 2) {
-      card.states.switchInstant('remove');
     }
   }
 
+  /*
+  debugBtn = new Layer({
+    width: 20,
+    height: 20,
+    backgroundColor: "blue"
+  });
+
+  debugBtn.on(Events.Click, DumpCards);
+  */
 };
 
 tinder();
